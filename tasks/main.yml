@@ -1,19 +1,14 @@
 ---
 # tasks file for symfony2
-- name: Create the release {{symfony2_project_release}} directory.
-  file: state=directory path={{symfony2_project_root}}/releases/{{symfony2_project_release}}
-
-- name: Create the shared directory.
-  file: state=directory path={{symfony2_project_root}}/shared
-
-- name: Create the shared/app/config directory.
-  file: state=directory path={{symfony2_project_root}}/shared/app/config
-
-- name: Create the shared/web/uploads directory.
-  file: state=directory path={{symfony2_project_root}}/shared/web/uploads
-
-- name: Create the shared/app/logs directory.
-  file: state=directory path={{symfony2_project_root}}/shared/app/logs mode=0777
+- name: Create symfony dirs
+  file: state=directory path={{symfony2_project_root}}/{{ item.dir }} mode={{ item.perms }}
+  with_items:
+    - { dir: "releases/{{symfony2_project_release}}", perms: 755 }
+    - { dir: "shared", perms: 755 }
+    - { dir: "data_backup", perms: 755 }
+    - { dir: "shared/app/config", perms: 755 }
+    - { dir: "shared/web/uploads", perms: 777 }
+    - { dir: "shared/app/logs", perms: 777 }
 
 - name: Pull sources from the repository.
   git: repo={{symfony2_project_repo}} dest={{symfony2_project_root}}/releases/{{symfony2_project_release}} version={{symfony2_project_branch}} accept_hostkey=yes
@@ -55,7 +50,7 @@
   shell: cd {{symfony2_project_root}}/releases/{{symfony2_project_release}} && if $(grep doctrine-migrations-bundle composer.json); then {{symfony2_project_php_path}} app/console doctrine:migrations:migrate -n; fi
 
 - name: Cache clear
-  shell: cd {{symfony2_project_root}}/releases/{{symfony2_project_release}} && rm -rf app/cache/*
+  shell: cd {{symfony2_project_root}}/releases/{{symfony2_project_release}} && rm -rf app/cache/* && chmod -R 777 app/cache && chmod -R 777 app/logs
 
 - name: Create symlink
   file: state=link src={{symfony2_project_root}}/releases/{{symfony2_project_release}} path={{symfony2_project_root}}/current

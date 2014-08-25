@@ -1,0 +1,61 @@
+---
+# tasks file for symfony2
+- name: Create the release {{symfony2_project_release}} directory.
+  file: state=directory path={{symfony2_project_root}}/releases/{{symfony2_project_release}}
+
+- name: Create the shared directory.
+  file: state=directory path={{symfony2_project_root}}/shared
+
+- name: Create the shared/app/config directory.
+  file: state=directory path={{symfony2_project_root}}/shared/app/config
+
+- name: Create the shared/web/uploads directory.
+  file: state=directory path={{symfony2_project_root}}/shared/web/uploads
+
+- name: Create the shared/app/logs directory.
+  file: state=directory path={{symfony2_project_root}}/shared/app/logs mode=0777
+
+- name: Pull sources from the repository.
+  git: repo={{symfony2_project_repo}} dest={{symfony2_project_root}}/releases/{{symfony2_project_release}} version={{symfony2_project_branch}} accept_hostkey=yes
+
+- name: Check if shared/app/config/parameters.yml exists
+  stat: path={{symfony2_project_root}}/shared/app/config/parameters.yml
+  register: parametersyml
+
+- name: Create symlink for app/config/parameters.yml from shared directory
+  shell: ln -s {{symfony2_project_root}}/shared/app/config/parameters.yml {{symfony2_project_root}}/releases/{{symfony2_project_release}}/app/config/parameters.yml creates={{symfony2_project_root}}/releases/{{symfony2_project_release}}/app/config/parameters.yml
+  when: parametersyml.stat.exists
+
+- name: Create app/logs symlink
+  file: state=link src={{symfony2_project_root}}/shared/app/logs path={{symfony2_project_root}}/releases/{{symfony2_project_release}}/app/logs force=yes
+
+- name: Create web/uploads symlink
+  file: state=link src={{symfony2_project_root}}/shared/web/uploads path={{symfony2_project_root}}/releases/{{symfony2_project_release}}/web/uploads force=yes
+
+- name: Clean app/cache folder 
+  shell: rm -rf {{symfony2_project_root}}/releases/{{symfony2_project_release}}/app/cache/*
+
+- name: Create app/cache folder with permissions
+  file: state=directory path={{symfony2_project_root}}/releases/{{symfony2_project_release}}/app/cache mode=0777
+
+- name: Install composer
+  get_url: url=https://getcomposer.org/composer.phar dest={{symfony2_project_root}}/composer.phar mode=0755 validate_certs=no
+
+- name: Run composer install
+  shell: cd {{symfony2_project_root}}/releases/{{symfony2_project_release}} && {{symfony2_project_php_path}} {{symfony2_project_root}}/composer.phar install {{symfony2_project_composer_opts}}
+
+# Check this if can be disabled for some deploys because it's dangerous
+- name: Do schema update task
+  shell: cd {{symfony2_project_root}}/releases/{{symfony2_project_release}} && {{symfony2_project_php_path}} app/console doctrine:schema:update --force
+
+- name: Dump assets
+  shell: cd {{symfony2_project_root}}/releases/{{symfony2_project_release}} && {{symfony2_project_php_path}} app/console assetic:dump --env={{symfony2_project_env}} {{symfony2_project_console_opts}}
+
+- name: Run migrations
+  shell: cd {{symfony2_project_root}}/releases/{{symfony2_project_release}} && if $(grep doctrine-migrations-bundle composer.json); then {{symfony2_project_php_path}} app/console doctrine:migrations:migrate -n; fi
+
+- name: Cache clear
+  shell: cd {{symfony2_project_root}}/releases/{{symfony2_project_release}} && rm -rf app/cache/*
+
+- name: Create symlink
+  file: state=link src={{symfony2_project_root}}/releases/{{symfony2_project_release}} path={{symfony2_project_root}}/current

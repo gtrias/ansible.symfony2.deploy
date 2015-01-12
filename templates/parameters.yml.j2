@@ -1,0 +1,25 @@
+parameters:
+    database_driver: pdo_mysql
+    database_host: {{ mysql_hostname }}
+    database_port: null
+    database_name: {{ mysql_name }}
+    database_user: {{ mysql_user }}
+    database_password: {{ mysql_password }}
+    mailer_transport: smtp
+    mailer_host: 127.0.0.1
+    mailer_user: null
+    mailer_password: null
+    locale: es
+    secret: b68fe65e436e9f8d05f653bd8040122691c76629
+    database_path: null
+
+    # Assetic and Sonata Media Bundle urls
+    server_base_url: http://app-demo.levels.es/app_dev.php
+    assetic_http_path: /bundles/picmediabeta/
+    assetic_http_generated_images_path: /images
+
+    # Google Analytics Params
+    ga_client_id:  ""
+    ga_profile_id:  ""
+    ga_private_key_file: ""
+    ga_tracking_id: "-"

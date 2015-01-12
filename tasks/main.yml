@@ -12,50 +12,59 @@
     - { dir: "shared", perms: 755 }
     - { dir: "data_backup", perms: 755 }
     - { dir: "shared/app/config", perms: 755 }
+    - { dir: "shared/app/data", perms: 755 }
     - { dir: "shared/web/uploads", perms: 777 }
     - { dir: "shared/app/logs", perms: 777 }
 
 - name: Pull sources from the repository.
   git: repo={{symfony2_project_repo}} dest={{symfony2_project_root}}/releases/{{commithash.stdout}} version={{symfony2_project_branch}} accept_hostkey=yes
 
+- name: Create parameters.yml
+  action: template src=parameters.yml.j2 dest={{symfony2_project_root}}/shared/app/config/parameters.yml
+
 - name: Check if shared/app/config/parameters.yml exists
   stat: path={{symfony2_project_root}}/shared/app/config/parameters.yml
   register: parametersyml
 
-- include_vars: "{{symfony2_project_root}}/shared/app/config/parameters.yml"
-
 - name: Create symlink for app/config/parameters.yml from shared directory
-  shell: ln -sf {{symfony2_project_root}}/shared/app/config/parameters.yml {{symfony2_project_root}}/releases/{{commithash.stdout}}/app/config/parameters.yml creates={{symfony2_project_root}}/releases/{{symfony2_project_release}}/app/config/parameters.yml
+  shell: ln -sf {{symfony2_project_root}}/shared/app/config/parameters.yml {{symfony2_project_root}}/releases/{{commithash.stdout}}/{{symfony2_project_app_path}}/config/parameters.yml creates={{symfony2_project_root}}/releases/{{symfony2_project_release}}/{{symfony2_project_app_path}}/config/parameters.yml
   when: parametersyml.stat.exists
 
 - name: Create app/logs symlink
-  file: state=link src={{symfony2_project_root}}/shared/app/logs path={{symfony2_project_root}}/releases/{{commithash.stdout}}/app/logs force=yes
+  file: state=link src={{symfony2_project_root}}/shared/app/logs path={{symfony2_project_root}}/releases/{{commithash.stdout}}/{{symfony2_project_app_path}}/logs force=yes
+
+- name: Create app/data symlink
+  file: state=link src={{symfony2_project_root}}/shared/app/data path={{symfony2_project_root}}/releases/{{commithash.stdout}}/{{symfony2_project_app_path}}/data force=yes
 
 - name: Create web/uploads symlink
   file: state=link src={{symfony2_project_root}}/shared/web/uploads path={{symfony2_project_root}}/releases/{{commithash.stdout}}/web/uploads force=yes
 
 - name: Clean app/cache folder 
-  shell: rm -rf {{symfony2_project_root}}/releases/{{commithash.stdout}}/app/cache/*
+  shell: rm -rf {{symfony2_project_root}}/releases/{{commithash.stdout}}/{{symfony2_project_app_path}}/cache/*
 
 - name: Create app/cache folder with permissions
-  file: state=directory path={{symfony2_project_root}}/releases/{{commithash.stdout}}/app/cache mode=0777
+  file: state=directory path={{symfony2_project_root}}/releases/{{commithash.stdout}}/{{symfony2_project_app_path}}/cache mode=0777
 
-- name: Install composer
-  get_url: url=https://getcomposer.org/composer.phar dest={{symfony2_project_root}}/composer.phar mode=0755 validate_certs=no
+#- name: Install composer
+  #get_url: url=https://getcomposer.org/composer.phar dest={{symfony2_project_root}}/composer.phar mode=0755 validate_certs=no
 
 - name: Do a database backup
-  mysql_db: name={{database_name}} login_user={{database_user}} login_password={{database_password}} login_host={{database_host}} state=import target={{symfony2_project_root}}/data_backup/dump_{{commithash.stdout}}.sql.bz2
+  mysql_db: name={{mysql_name}} login_user={{mysql_user}} login_password={{mysql_password}} login_host={{mysql_hostname}} state=dump target={{symfony2_project_root}}/data_backup/dump_{{commithash.stdout}}.sql.bz2
 
 # Check this if can be disabled for some deploys because it's dangerous
 #- name: Do database create if not exists
   #shell: cd {{symfony2_project_root}}/releases/{{commithash.stdout}} && {{symfony2_project_php_path}} app/console doctrine:database:create --quiet
+#
+#- name: Do database create if not exists
+  #shell: cd {{symfony2_project_root}}/releases/{{commithash.stdout}} && {{symfony2_project_php_path}} app/console doctrine:database:create --quiet --env=test
 
 - name: Run composer install
-  shell: cd {{symfony2_project_root}}/releases/{{commithash.stdout}} && {{symfony2_project_php_path}} {{symfony2_project_root}}/composer.phar install {{symfony2_project_composer_opts}}
+  #shell: cd {{symfony2_project_root}}/releases/{{commithash.stdout}} && {{symfony2_project_php_path}} {{symfony2_project_root}}/composer.phar install {{symfony2_project_composer_opts}}
+  composer: no_scripts=yes no_dev=no working_dir={{symfony2_project_root}}/releases/{{commithash.stdout}}/
 
 # Check this if can be disabled for some deploys because it's dangerous
-- name: Do schema update task
-  shell: cd {{symfony2_project_root}}/releases/{{commithash.stdout}} && {{symfony2_project_php_path}} app/console doctrine:schema:update --force
+#- name: Do schema update task
+  #shell: cd {{symfony2_project_root}}/releases/{{commithash.stdout}} && {{symfony2_project_php_path}} app/console doctrine:schema:update --force
 
 - name: Dump assets
   shell: cd {{symfony2_project_root}}/releases/{{commithash.stdout}} && {{symfony2_project_php_path}} app/console assetic:dump --env={{symfony2_project_env}} {{symfony2_project_console_opts}}
@@ -67,7 +76,11 @@
   shell: cd {{symfony2_project_root}}/releases/{{commithash.stdout}} && if $(grep doctrine-migrations-bundle composer.json); then {{symfony2_project_php_path}} app/console doctrine:migrations:migrate -n; fi
 
 - name: Cache clear
-  shell: cd {{symfony2_project_root}}/releases/{{commithash.stdout}} && rm -rf app/cache/* && chmod -R 777 app/cache && chmod -R 777 app/logs
+  shell: cd {{symfony2_project_root}}/releases/{{commithash.stdout}} && rm -rf {{symfony2_project_app_path}}/cache/* && chmod -R 777 {{symfony2_project_app_path}}/cache && chmod -R 777 {{symfony2_project_app_path}}/logs
+
+- name: Running tests
+  shell: cd {{symfony2_project_root}}/releases/{{commithash.stdout}} && {{symfony2_project_php_path}} bin/phpunit -c {{symfony2_project_app_path}}/
+
 
 # We should run this task only if others went ok
 - name: Create symlink

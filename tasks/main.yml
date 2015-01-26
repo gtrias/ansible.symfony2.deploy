@@ -33,6 +33,9 @@
 - name: Create app/logs symlink
   file: state=link src={{symfony2_project_root}}/shared/app/logs path={{symfony2_project_root}}/releases/{{commithash.stdout}}/{{symfony2_project_app_path}}/logs force=yes
 
+- name: Remove app/data directory
+  file: state=absent src={{symfony2_project_root}}/shared/app/data path={{symfony2_project_root}}/releases/{{commithash.stdout}}/{{symfony2_project_app_path}}/data force=yes
+
 - name: Create app/data symlink
   file: state=link src={{symfony2_project_root}}/shared/app/data path={{symfony2_project_root}}/releases/{{commithash.stdout}}/{{symfony2_project_app_path}}/data force=yes
 
@@ -43,10 +46,11 @@
   shell: rm -rf {{symfony2_project_root}}/releases/{{commithash.stdout}}/{{symfony2_project_app_path}}/cache/*
 
 - name: Create app/cache folder with permissions
-  file: state=directory path={{symfony2_project_root}}/releases/{{commithash.stdout}}/{{symfony2_project_app_path}}/cache mode=0777
+  file: state=directory path={{symfony2_project_root}}/releases/{{commithash.stdout}}/{{symfony2_project_app_path}}/cache 
 
-#- name: Install composer
-  #get_url: url=https://getcomposer.org/composer.phar dest={{symfony2_project_root}}/composer.phar mode=0755 validate_certs=no
+# apt-get intall acl
+- name: Setting permissions
+  shell: HTTPDUSER=`ps aux | grep -E '[a]pache|[h]ttpd|[_]www|[w]ww-data|[n]ginx' | grep -v root | head -1 | cut -d" " -f1` && sudo setfacl -R -m u:"$HTTPDUSER":rwX -m u:`whoami`:rwX {{symfony2_project_root}}/shared/app/app/cache {{symfony2_project_root}}/shared/app/logs && sudo setfacl -dR -m u:"$HTTPDUSER":rwX -m u:`whoami`:rwX  {{symfony2_project_root}}/shared/app/cache {{symfony2_project_root}}/shared/app/logs
 
 - name: Do a database backup
   mysql_db: name={{mysql_name}} login_user={{mysql_user}} login_password={{mysql_password}} login_host={{mysql_hostname}} state=dump target={{symfony2_project_root}}/data_backup/dump_{{commithash.stdout}}.sql.bz2
@@ -60,7 +64,13 @@
 
 - name: Run composer install
   #shell: cd {{symfony2_project_root}}/releases/{{commithash.stdout}} && {{symfony2_project_php_path}} {{symfony2_project_root}}/composer.phar install {{symfony2_project_composer_opts}}
-  composer: no_scripts=yes no_dev=no working_dir={{symfony2_project_root}}/releases/{{commithash.stdout}}/
+  composer: no_scripts=yes no_dev=no optimize_autoloader=yes working_dir={{symfony2_project_root}}/releases/{{commithash.stdout}}/
+
+#- name: Cache clear
+  #shell: cd {{symfony2_project_root}}/releases/{{commithash.stdout}} && rm -rf {{symfony2_project_app_path}}/cache/* && chmod -R 777 {{symfony2_project_app_path}}/cache && chmod -R 777 {{symfony2_project_app_path}}/logs
+
+- name: Cache clear
+  shell: cd {{symfony2_project_root}}/releases/{{commithash.stdout}} && {{symfony2_project_php_path}} app/console cache:clear --env={{symfony2_project_env}}
 
 # Check this if can be disabled for some deploys because it's dangerous
 #- name: Do schema update task
@@ -74,9 +84,6 @@
 
 - name: Run migrations
   shell: cd {{symfony2_project_root}}/releases/{{commithash.stdout}} && if $(grep doctrine-migrations-bundle composer.json); then {{symfony2_project_php_path}} app/console doctrine:migrations:migrate -n; fi
-
-- name: Cache clear
-  shell: cd {{symfony2_project_root}}/releases/{{commithash.stdout}} && rm -rf {{symfony2_project_app_path}}/cache/* && chmod -R 777 {{symfony2_project_app_path}}/cache && chmod -R 777 {{symfony2_project_app_path}}/logs
 
 - name: Running tests
   shell: cd {{symfony2_project_root}}/releases/{{commithash.stdout}} && {{symfony2_project_php_path}} bin/phpunit -c {{symfony2_project_app_path}}/

@@ -27,7 +27,7 @@
   register: parametersyml
 
 - name: Create symlink for app/config/parameters.yml from shared directory
-  shell: ln -sf {{symfony2_project_root}}/shared/app/config/parameters.yml {{symfony2_project_root}}/releases/{{commithash.stdout}}/{{symfony2_project_app_path}}/config/parameters.yml creates={{symfony2_project_root}}/releases/{{symfony2_project_release}}/{{symfony2_project_app_path}}/config/parameters.yml
+  shell: ln -sf {{symfony2_project_root}}/shared/app/config/parameters.yml {{symfony2_project_root}}/releases/{{commithash.stdout}}/{{symfony2_project_app_path}}/config/parameters.yml creates={{symfony2_project_root}}/releases/{{commithash.stdout}}/{{symfony2_project_app_path}}/config/parameters.yml
   when: parametersyml.stat.exists
 
 - name: Create app/logs symlink
@@ -49,8 +49,8 @@
   file: state=directory path={{symfony2_project_root}}/releases/{{commithash.stdout}}/{{symfony2_project_app_path}}/cache 
 
 # apt-get intall acl
-- name: Setting permissions
-  shell: HTTPDUSER=`ps aux | grep -E '[a]pache|[h]ttpd|[_]www|[w]ww-data|[n]ginx' | grep -v root | head -1 | cut -d" " -f1` && sudo setfacl -R -m u:"$HTTPDUSER":rwX -m u:`whoami`:rwX {{symfony2_project_root}}/shared/app/app/cache {{symfony2_project_root}}/shared/app/logs && sudo setfacl -dR -m u:"$HTTPDUSER":rwX -m u:`whoami`:rwX  {{symfony2_project_root}}/shared/app/cache {{symfony2_project_root}}/shared/app/logs
+#- name: Setting permissions
+  #shell: HTTPDUSER=`ps aux | grep -E '[a]pache|[h]ttpd|[_]www|[w]ww-data|[n]ginx' | grep -v root | head -1 | cut -d" " -f1` && sudo setfacl -R -m u:"$HTTPDUSER":rwX -m u:`whoami`:rwX {{symfony2_project_root}}/shared/app/app/cache {{symfony2_project_root}}/shared/app/logs && sudo setfacl -dR -m u:"$HTTPDUSER":rwX -m u:`whoami`:rwX  {{symfony2_project_root}}/shared/app/cache {{symfony2_project_root}}/shared/app/logs
 
 - name: Do a database backup
   mysql_db: name={{mysql_name}} login_user={{mysql_user}} login_password={{mysql_password}} login_host={{mysql_hostname}} state=dump target={{symfony2_project_root}}/data_backup/dump_{{commithash.stdout}}.sql.bz2
@@ -66,15 +66,15 @@
   #shell: cd {{symfony2_project_root}}/releases/{{commithash.stdout}} && {{symfony2_project_php_path}} {{symfony2_project_root}}/composer.phar install {{symfony2_project_composer_opts}}
   composer: no_scripts=yes no_dev=no optimize_autoloader=yes working_dir={{symfony2_project_root}}/releases/{{commithash.stdout}}/
 
-#- name: Cache clear
-  #shell: cd {{symfony2_project_root}}/releases/{{commithash.stdout}} && rm -rf {{symfony2_project_app_path}}/cache/* && chmod -R 777 {{symfony2_project_app_path}}/cache && chmod -R 777 {{symfony2_project_app_path}}/logs
-
 - name: Cache clear
-  shell: cd {{symfony2_project_root}}/releases/{{commithash.stdout}} && {{symfony2_project_php_path}} app/console cache:clear --env={{symfony2_project_env}}
+  shell: cd {{symfony2_project_root}}/releases/{{commithash.stdout}} && rm -rf {{symfony2_project_app_path}}/cache/* && chmod -R 777 {{symfony2_project_app_path}}/cache && chmod -R 777 {{symfony2_project_app_path}}/logs
 
 # Check this if can be disabled for some deploys because it's dangerous
 #- name: Do schema update task
   #shell: cd {{symfony2_project_root}}/releases/{{commithash.stdout}} && {{symfony2_project_php_path}} app/console doctrine:schema:update --force
+
+- name: Cache Warmup
+  shell: cd {{symfony2_project_root}}/releases/{{commithash.stdout}} && vendor/sensio/distribution-bundle/Sensio/Bundle/DistributionBundle/Resources/bin/build_bootstrap.php && php app/console cache:warmup &&  chmod -R 777 {{symfony2_project_app_path}}/cache 
 
 - name: Dump assets
   shell: cd {{symfony2_project_root}}/releases/{{commithash.stdout}} && {{symfony2_project_php_path}} app/console assetic:dump --env={{symfony2_project_env}} {{symfony2_project_console_opts}}
@@ -88,6 +88,11 @@
 - name: Running tests
   shell: cd {{symfony2_project_root}}/releases/{{commithash.stdout}} && {{symfony2_project_php_path}} bin/phpunit -c {{symfony2_project_app_path}}/
 
+#- name: Setting permissions
+  #shell: HTTPDUSER=`ps aux | grep -E '[a]pache|[h]ttpd|[_]www|[w]ww-data|[n]ginx' | grep -v root | head -1 | cut -d" " -f1` && sudo setfacl -R -m u:"$HTTPDUSER":rwX -m u:`whoami`:rwX {{symfony2_project_root}}/shared/app/app/cache {{symfony2_project_root}}/shared/app/logs && sudo setfacl -dR -m u:"$HTTPDUSER":rwX -m u:`whoami`:rwX  {{symfony2_project_root}}/shared/app/cache {{symfony2_project_root}}/shared/app/logs
+
+- name: Cache clear
+  shell: cd {{symfony2_project_root}}/releases/{{commithash.stdout}} && rm -rf {{symfony2_project_app_path}}/cache/* && chmod -R 777 {{symfony2_project_app_path}}/cache && chmod -R 777 {{symfony2_project_app_path}}/logs
 
 # We should run this task only if others went ok
 - name: Create symlink

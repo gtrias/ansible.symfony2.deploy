@@ -19,13 +19,6 @@ Requirements
 
 None
 
-Installation
-------------
-
-```
-    $ ansible-galaxy install servergrove.symfony2
-```
-
 
 Role Variables
 --------------
@@ -56,15 +49,10 @@ Including an example of how to use your role (for instance, with variables passe
 ```yaml
 - hosts: servers
     roles:
-        - { role: servergrove.symfony2, symfony2_project_root: /var/www/vhosts/example.com/, symfony2_project_name: demo, symfony2_project_branch: master, symfony2_project_release: 1 }
+        - { role: symfony2.deploy, symfony2_project_root: /var/www/vhosts/example.com/, symfony2_project_name: demo, symfony2_project_branch: master, symfony2_project_release: 1 }
 ```
 
 License
 -------
 
 MIT
-
-Author Information
-------------------
-
-Contributions are welcome: https://github.com/servergrove/ansible-symfony2

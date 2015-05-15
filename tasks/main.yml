@@ -17,7 +17,8 @@
     - { dir: "shared/app/logs", perms: 777 }
 
 - name: Pull sources from the repository.
-  git: repo={{symfony2_project_repo}} dest={{symfony2_project_root}}/releases/{{commithash.stdout}} version={{symfony2_project_branch}} accept_hostkey=yes
+  git: repo={{symfony2_project_repo}} dest={{symfony2_project_root}}/releases/{{commithash.stdout}} version={{symfony2_project_branch}} accept_hostkey=yes force=true
+  register: pullresult
 
 - name: Create parameters.yml
   action: template src=parameters.yml.j2 dest={{symfony2_project_root}}/shared/app/config/parameters.yml
@@ -29,6 +30,9 @@
 - name: Create symlink for app/config/parameters.yml from shared directory
   shell: ln -sf {{symfony2_project_root}}/shared/app/config/parameters.yml {{symfony2_project_root}}/releases/{{commithash.stdout}}/{{symfony2_project_app_path}}/config/parameters.yml creates={{symfony2_project_root}}/releases/{{commithash.stdout}}/{{symfony2_project_app_path}}/config/parameters.yml
   when: parametersyml.stat.exists
+
+- name: Remove project logs folder
+  shell: rm -rf {{symfony2_project_root}}/releases/{{commithash.stdout}}/{{symfony2_project_app_path}}/logs
 
 - name: Create app/logs symlink
   file: state=link src={{symfony2_project_root}}/shared/app/logs path={{symfony2_project_root}}/releases/{{commithash.stdout}}/{{symfony2_project_app_path}}/logs force=yes
@@ -42,15 +46,18 @@
 - name: Create web/uploads symlink
   file: state=link src={{symfony2_project_root}}/shared/web/uploads path={{symfony2_project_root}}/releases/{{commithash.stdout}}/web/uploads force=yes
 
-- name: Clean app/cache folder 
+- name: Clean app/cache folder
   shell: rm -rf {{symfony2_project_root}}/releases/{{commithash.stdout}}/{{symfony2_project_app_path}}/cache/*
 
 - name: Create app/cache folder with permissions
-  file: state=directory path={{symfony2_project_root}}/releases/{{commithash.stdout}}/{{symfony2_project_app_path}}/cache 
+  file: state=directory path={{symfony2_project_root}}/releases/{{commithash.stdout}}/{{symfony2_project_app_path}}/cache
 
 # apt-get intall acl
 #- name: Setting permissions
   #shell: HTTPDUSER=`ps aux | grep -E '[a]pache|[h]ttpd|[_]www|[w]ww-data|[n]ginx' | grep -v root | head -1 | cut -d" " -f1` && sudo setfacl -R -m u:"$HTTPDUSER":rwX -m u:`whoami`:rwX {{symfony2_project_root}}/shared/app/app/cache {{symfony2_project_root}}/shared/app/logs && sudo setfacl -dR -m u:"$HTTPDUSER":rwX -m u:`whoami`:rwX  {{symfony2_project_root}}/shared/app/cache {{symfony2_project_root}}/shared/app/logs
+
+- name: Create database if not exists
+  mysql_db: name={{ mysql_name }} state=present
 
 - name: Do a database backup
   mysql_db: name={{mysql_name}} login_user={{mysql_user}} login_password={{mysql_password}} login_host={{mysql_hostname}} state=dump target={{symfony2_project_root}}/data_backup/dump_{{commithash.stdout}}.sql.bz2
@@ -64,7 +71,7 @@
 
 - name: Run composer install
   #shell: cd {{symfony2_project_root}}/releases/{{commithash.stdout}} && {{symfony2_project_php_path}} {{symfony2_project_root}}/composer.phar install {{symfony2_project_composer_opts}}
-  composer: no_scripts=yes no_dev=no optimize_autoloader=yes working_dir={{symfony2_project_root}}/releases/{{commithash.stdout}}/
+  composer: no_scripts=no no_dev=no optimize_autoloader=yes working_dir={{symfony2_project_root}}/releases/{{commithash.stdout}}/
 
 - name: Cache clear
   shell: cd {{symfony2_project_root}}/releases/{{commithash.stdout}} && rm -rf {{symfony2_project_app_path}}/cache/* && chmod -R 777 {{symfony2_project_app_path}}/cache && chmod -R 777 {{symfony2_project_app_path}}/logs
@@ -74,7 +81,7 @@
   #shell: cd {{symfony2_project_root}}/releases/{{commithash.stdout}} && {{symfony2_project_php_path}} app/console doctrine:schema:update --force
 
 - name: Cache Warmup
-  shell: cd {{symfony2_project_root}}/releases/{{commithash.stdout}} && vendor/sensio/distribution-bundle/Sensio/Bundle/DistributionBundle/Resources/bin/build_bootstrap.php && php app/console cache:warmup &&  chmod -R 777 {{symfony2_project_app_path}}/cache 
+  shell: cd {{symfony2_project_root}}/releases/{{commithash.stdout}} && php app/console cache:warmup &&  chmod -R 777 {{symfony2_project_app_path}}/cache
 
 #- name: Dump assets
   #shell: cd {{symfony2_project_root}}/releases/{{commithash.stdout}} && {{symfony2_project_php_path}} app/console assetic:dump --env={{symfony2_project_env}} {{symfony2_project_console_opts}}
